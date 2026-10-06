@@ -176,3 +176,191 @@ app.post('/api/deposit-request', auth, function (req, res) {
   db.save()
   res.json({ ok: true, id: id })
 })
+
+app.post('/api/withdraw', auth, function (req, res) {
+  const amt = parseFloat(req.body.amount)
+  const network = req.body.network || 'USDC'
+  const address = req.body.address
+  if (!amt || amt <= 0) return res.status(400).json({ error: 'Invalid amount' })
+  if (!address || address.length < 15) return res.status(400).json({ error: 'Invalid address' })
+
+  const data = db.get()
+  const user = data.users.find(function (u) { return u.id === req.user.id })
+  if (!user || user.balance < amt) return res.status(400).json({ error: 'Insufficient balance' })
+
+  user.balance -= amt
+  const id = randomUUID()
+  data.withdraw_requests.push({
+    id: id,
+    user_id: user.id,
+    amount: amt,
+    network: network,
+    address: address,
+    status: 'pending',
+    created_at: Date.now(),
+  })
+  data.transactions.push({
+    id: randomUUID(),
+    user_id: user.id,
+    type: 'withdraw',
+    amount: -amt,
+    description: 'Saque ' + network + ' -> ' + address.slice(0, 8) + '...',
+    created_at: Date.now(),
+  })
+  db.save()
+  res.json({ ok: true, id: id })
+})
+
+app.get('/api/admin/pending-deposits', admin, function (req, res) {
+  const data = db.get()
+  const rows = data.deposit_requests
+    .filter(function (d) { return d.status === 'pending' })
+    .map(function (d) {
+      const u = data.users.find(function (x) { return x.id === d.user_id }) || {}
+      return Object.assign({}, d, {
+        telegram_id: u.telegram_id,
+        username: u.username,
+        first_name: u.first_name,
+      })
+    })
+  res.json(rows)
+})
+
+app.get('/api/admin/pending-withdrawals', admin, function (req, res) {
+  const data = db.get()
+  const rows = data.withdraw_requests
+    .filter(function (w) { return w.status === 'pending' })
+    .map(function (w) {
+      const u = data.users.find(function (x) { return x.id === w.user_id }) || {}
+      return Object.assign({}, w, {
+        telegram_id: u.telegram_id,
+        username: u.username,
+        first_name: u.first_name,
+      })
+    })
+  res.json(rows)
+})
+
+app.post('/api/admin/credit-deposit', admin, function (req, res) {
+  const depositId = req.body.depositId
+  const amount = req.body.amount
+  const data = db.get()
+  const dep = data.deposit_requests.find(function (d) { return d.id === depositId })
+  if (!dep || dep.status !== 'pending') return res.status(400).json({ error: 'Invalid deposit' })
+  const user = data.users.find(function (u) { return u.id === dep.user_id })
+  if (!user) return res.status(404).json({ error: 'User not found' })
+  user.balance += amount
+  dep.status = 'credited'
+  dep.amount = amount
+  data.transactions.push({
+    id: randomUUID(),
+    user_id: user.id,
+    type: 'deposit',
+    amount: amount,
+    description: 'Deposito ' + dep.coin + ' confirmado',
+    created_at: Date.now(),
+  })
+  db.save()
+  res.json({ ok: true })
+})
+
+app.post('/api/admin/process-withdraw', admin, function (req, res) {
+  const withdrawId = req.body.withdrawId
+  const action = req.body.action
+  const data = db.get()
+  const w = data.withdraw_requests.find(function (x) { return x.id === withdrawId })
+  if (!w || w.status !== 'pending') return res.status(400).json({ error: 'Invalid' })
+  if (action === 'complete') {
+    w.status = 'completed'
+  } else {
+    const user = data.users.find(function (u) { return u.id === w.user_id })
+    if (user) user.balance += w.amount
+    w.status = 'rejected'
+    data.transactions.push({
+      id: randomUUID(),
+      user_id: w.user_id,
+      type: 'deposit',
+      amount: w.amount,
+      description: 'Saque rejeitado - valor devolvido',
+      created_at: Date.now(),
+    })
+  }
+  db.save()
+  res.json({ ok: true })
+})
+
+app.get('/api/admin/users', admin, function (req, res) {
+  res.json(db.get().users)
+})
+
+app.get('/api/admin/bots', admin, function (req, res) {
+  ensureLiveBots()
+  const bots = db.get().bots.map(function (b) {
+    const l = liveBots[b.id]
+    return Object.assign({}, b, {
+      status: (l && l.status) || 'idle',
+      currentMatch: (l && l.currentMatch) || null,
+      odd: (l && l.odd) || 0,
+      profit: l ? l.profit : null,
+      lastUpdate: (l && l.lastUpdate) || null,
+    })
+  })
+  res.json(bots)
+})
+
+app.post('/api/admin/bots', admin, function (req, res) {
+  const name = req.body.name
+  const league = req.body.league
+  const stake = parseFloat(req.body.stake) || 10
+  if (!name || !league) return res.status(400).json({ error: 'name e league obrigatorios' })
+  const id = 'b' + randomUUID().replace(/-/g, '').slice(0, 10)
+  const bot = { id: id, name: String(name).trim(), league: String(league).trim(), stake: stake, active: 1 }
+  db.get().bots.push(bot)
+  db.save()
+  liveBots[id] = {
+    id: id, name: bot.name, league: bot.league, stake: stake, active: 1,
+    status: 'scanning', currentMatch: null, odd: 0, profit: null, lastUpdate: Date.now(),
+  }
+  res.json({ ok: true, id: id })
+})
+
+app.put('/api/admin/bots/:id', admin, function (req, res) {
+  const data = db.get()
+  const bot = data.bots.find(function (b) { return b.id === req.params.id })
+  if (!bot) return res.status(404).json({ error: 'Robo nao encontrado' })
+  if (req.body.name != null) bot.name = req.body.name
+  if (req.body.league != null) bot.league = req.body.league
+  if (req.body.stake != null) bot.stake = parseFloat(req.body.stake)
+  if (req.body.active != null) bot.active = req.body.active ? 1 : 0
+  db.save()
+  if (liveBots[bot.id]) {
+    liveBots[bot.id].name = bot.name
+    liveBots[bot.id].league = bot.league
+    liveBots[bot.id].stake = bot.stake
+    liveBots[bot.id].active = bot.active
+    if (!bot.active) {
+      liveBots[bot.id].status = 'idle'
+      liveBots[bot.id].currentMatch = null
+    }
+  } else if (bot.active) {
+    liveBots[bot.id] = {
+      id: bot.id, name: bot.name, league: bot.league, stake: bot.stake, active: 1,
+      status: 'scanning', currentMatch: null, odd: 0, profit: null, lastUpdate: Date.now(),
+    }
+  }
+  res.json({ ok: true })
+})
+
+app.delete('/api/admin/bots/:id', admin, function (req, res) {
+  const data = db.get()
+  const i = data.bots.findIndex(function (b) { return b.id === req.params.id })
+  if (i < 0) return res.status(404).json({ error: 'Robo nao encontrado' })
+  data.bots.splice(i, 1)
+  delete liveBots[req.params.id]
+  db.save()
+  res.json({ ok: true })
+})
+
+app.listen(PORT, function () {
+  console.log('FutInvest API on port ' + PORT)
+})
