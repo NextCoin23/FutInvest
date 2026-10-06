@@ -16,7 +16,7 @@ const DEPOSIT_ADDRESSES = {
 const BOT_STATUSES = ['idle', 'scanning', 'entry_found', 'in_trade', 'win', 'loss']
 const MATCH_POOL = [
   'Arsenal vs Tottenham', 'Man City vs Liverpool', 'Real Madrid vs Valencia',
-  'Barcelona vs Atlético', 'Bayern vs Leverkusen', 'Dortmund vs Leipzig',
+  'Barcelona vs Atletico', 'Bayern vs Leverkusen', 'Dortmund vs Leipzig',
   'Inter vs Roma', 'Juventus vs Napoli', 'PSG vs Lyon', 'Benfica vs Sporting',
 ]
 
@@ -30,7 +30,7 @@ function getTgUser(req) {
       const params = new URLSearchParams(initData)
       const userStr = params.get('user')
       if (userStr) return JSON.parse(userStr)
-    } catch {}
+    } catch (e) {}
   }
   const devId = req.headers['x-dev-telegram-id']
   if (devId) return { id: devId, first_name: 'Dev', username: 'dev' }
@@ -39,10 +39,10 @@ function getTgUser(req) {
 
 function getOrCreateUser(tg) {
   const data = db.get()
-  let user = data.users.find(u => u.telegram_id === String(tg.id))
+  let user = data.users.find(function (u) { return u.telegram_id === String(tg.id) })
   if (user) return user
   user = {
-    id: uuid(),
+    id: randomUUID(),
     telegram_id: String(tg.id),
     username: tg.username || null,
     first_name: tg.first_name || null,
@@ -70,17 +70,23 @@ function admin(req, res, next) {
 }
 
 const liveBots = {}
+
 function ensureLiveBots() {
   const data = db.get()
-  const active = data.bots.filter(b => b.active)
-  const ids = new Set(active.map(b => b.id))
-  for (const id of Object.keys(liveBots)) {
-    if (!ids.has(id)) delete liveBots[id]
-  }
-  for (const b of active) {
+  const active = data.bots.filter(function (b) { return b.active })
+  const ids = {}
+  active.forEach(function (b) { ids[b.id] = true })
+  Object.keys(liveBots).forEach(function (id) {
+    if (!ids[id]) delete liveBots[id]
+  })
+  active.forEach(function (b) {
     if (!liveBots[b.id]) {
       liveBots[b.id] = {
-        ...b,
+        id: b.id,
+        name: b.name,
+        league: b.league,
+        stake: b.stake,
+        active: b.active,
         status: 'scanning',
         currentMatch: null,
         odd: 0,
@@ -88,14 +94,15 @@ function ensureLiveBots() {
         lastUpdate: Date.now(),
       }
     }
-  }
+  })
 }
+
 ensureLiveBots()
 
-setInterval(() => {
+setInterval(function () {
   ensureLiveBots()
-  for (const id of Object.keys(liveBots)) {
-    if (Math.random() > 0.5) continue
+  Object.keys(liveBots).forEach(function (id) {
+    if (Math.random() > 0.5) return
     const bot = liveBots[id]
     const idx = BOT_STATUSES.indexOf(bot.status)
     const next = BOT_STATUSES[(idx + 1) % BOT_STATUSES.length]
@@ -112,13 +119,60 @@ setInterval(() => {
       bot.profit = null
       bot.odd = 0
     }
-  }
+  })
 }, 5000)
 
-app.get('/api/health', (_, res) => res.json({ ok: true, time: Date.now() }))
-app.get('/api/deposit-addresses', (_, res) => res.json(DEPOSIT_ADDRESSES))
+app.get('/api/health', function (req, res) {
+  res.json({ ok: true, time: Date.now() })
+})
 
-app.get('/api/me', auth, (req, res) => {
+app.get('/api/deposit-addresses', function (req, res) {
+  res.json(DEPOSIT_ADDRESSES)
+})
+
+app.get('/api/me', auth, function (req, res) {
   const data = db.get()
   const txs = data.transactions
-    .filter(t => t.user_id === req.user.id)
+    .filter(function (t) { return t.user_id === req.user.id })
+    .sort(function (a, b) { return b.created_at - a.created_at })
+    .slice(0, 40)
+  res.json({
+    id: req.user.id,
+    firstName: req.user.first_name,
+    username: req.user.username,
+    balance: req.user.balance,
+    totalProfit: req.user.total_profit,
+    transactions: txs,
+  })
+})
+
+app.get('/api/bots/live', auth, function (req, res) {
+  ensureLiveBots()
+  res.json(Object.keys(liveBots).map(function (id) { return liveBots[id] }))
+})
+
+app.get('/api/history', auth, function (req, res) {
+  res.json(db.get().match_history)
+})
+
+app.post('/api/deposit-request', auth, function (req, res) {
+  const coin = req.body.coin
+  const amount = req.body.amount
+  const txHash = req.body.txHash
+  if (['BTC', 'ETH', 'USDC'].indexOf(coin) < 0) {
+    return res.status(400).json({ error: 'Invalid coin' })
+  }
+  const data = db.get()
+  const id = randomUUID()
+  data.deposit_requests.push({
+    id: id,
+    user_id: req.user.id,
+    coin: coin,
+    amount: amount || null,
+    tx_hash: txHash || null,
+    status: 'pending',
+    created_at: Date.now(),
+  })
+  db.save()
+  res.json({ ok: true, id: id })
+})
