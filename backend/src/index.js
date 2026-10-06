@@ -1,6 +1,6 @@
 import express from 'express'
 import cors from 'cors'
-import { v4 as uuid } from 'uuid'
+import { randomUUID } from 'crypto'
 import { db } from './db.js'
 
 const app = express()
