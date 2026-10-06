@@ -361,6 +361,7 @@ app.delete('/api/admin/bots/:id', admin, function (req, res) {
   res.json({ ok: true })
 })
 
-app.listen(PORT, function () {
-  console.log('FutInvest API on port ' + PORT)
+const port = Number(process.env.PORT) || 3001
+app.listen(port, '0.0.0.0', function () {
+  console.log('FutInvest API on port ' + port)
 })
