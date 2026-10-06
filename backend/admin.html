@@ -1,0 +1,615 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>FutInvest Admin</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: Inter, system-ui, -apple-system, sans-serif;
+      background: #0a0f0c;
+      color: #f0fdf4;
+      padding: 20px;
+      min-height: 100vh;
+    }
+    h1 { font-size: 22px; margin-bottom: 4px; }
+    .sub { color: #86a899; font-size: 13px; margin-bottom: 20px; }
+    h2 {
+      font-size: 15px;
+      margin: 28px 0 12px;
+      color: #22c55e;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    h2 .count {
+      background: rgba(34,197,94,0.15);
+      color: #22c55e;
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 10px;
+      font-weight: 700;
+    }
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+      margin-bottom: 20px;
+      padding: 14px;
+      background: #111916;
+      border: 1px solid #1e2e26;
+      border-radius: 12px;
+    }
+    input, select, button {
+      padding: 10px 12px;
+      border-radius: 8px;
+      border: 1px solid #1e2e26;
+      background: #0a0f0c;
+      color: #f0fdf4;
+      font-size: 13px;
+      font-family: inherit;
+    }
+    input:focus, select:focus { outline: none; border-color: #22c55e; }
+    button {
+      background: #22c55e;
+      color: #0a0f0c;
+      font-weight: 700;
+      border: none;
+      cursor: pointer;
+    }
+    button:hover { filter: brightness(1.08); }
+    button.secondary { background: #1a2420; color: #f0fdf4; border: 1px solid #2a3d34; }
+    button.danger { background: #ef4444; color: #fff; }
+    button.sm { padding: 6px 10px; font-size: 12px; }
+    .card {
+      background: #111916;
+      border: 1px solid #1e2e26;
+      border-radius: 12px;
+      padding: 0;
+      overflow: hidden;
+      margin-bottom: 8px;
+    }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th, td { text-align: left; padding: 11px 12px; border-bottom: 1px solid #1e2e26; vertical-align: middle; }
+    th { color: #86a899; font-weight: 500; font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; background: #0d1510; }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: rgba(34,197,94,0.03); }
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 8px;
+      font-size: 11px;
+      font-weight: 700;
+    }
+    .badge.green { background: rgba(34,197,94,0.15); color: #22c55e; }
+    .badge.red { background: rgba(239,68,68,0.15); color: #ef4444; }
+    .badge.orange { background: rgba(245,158,11,0.15); color: #f59e0b; }
+    .badge.blue { background: rgba(59,130,246,0.15); color: #3b82f6; }
+    .addr {
+      font-family: ui-monospace, monospace;
+      font-size: 11px;
+      word-break: break-all;
+      max-width: 220px;
+      color: #a7f3d0;
+    }
+    .row-actions { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+    .empty { padding: 24px; text-align: center; color: #86a899; font-size: 13px; }
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 10px;
+      margin-bottom: 8px;
+    }
+    .stat {
+      background: #111916;
+      border: 1px solid #1e2e26;
+      border-radius: 12px;
+      padding: 14px;
+    }
+    .stat .lbl { font-size: 11px; color: #86a899; text-transform: uppercase; letter-spacing: 0.04em; }
+    .stat .val { font-size: 22px; font-weight: 800; margin-top: 4px; color: #22c55e; }
+    .tabs {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+    }
+    .tab {
+      padding: 8px 14px;
+      border-radius: 8px;
+      background: #111916;
+      border: 1px solid #1e2e26;
+      color: #86a899;
+      font-weight: 600;
+      font-size: 13px;
+      cursor: pointer;
+    }
+    .tab.active { background: rgba(34,197,94,0.15); color: #22c55e; border-color: rgba(34,197,94,0.35); }
+    .panel { display: none; }
+    .panel.active { display: block; }
+    .copy-btn {
+      background: transparent;
+      border: 1px solid #2a3d34;
+      color: #22c55e;
+      padding: 4px 8px;
+      font-size: 11px;
+      cursor: pointer;
+      border-radius: 6px;
+    }
+    @media (max-width: 700px) {
+      body { padding: 12px; }
+      table { font-size: 12px; }
+      th, td { padding: 8px; }
+      .addr { max-width: 120px; }
+    }
+  </style>
+</head>
+<body>
+  <h1>⚽ FutInvest Admin</h1>
+  <p class="sub">Painel completo — depósitos, saques, utilizadores, robôs e histórico</p>
+
+  <div class="toolbar">
+    <input id="secret" type="password" placeholder="Admin secret" style="width:200px" />
+    <input id="api" type="text" placeholder="API URL" value="http://localhost:3001" style="width:220px" />
+    <button onclick="loadAll()">Carregar tudo</button>
+    <button class="secondary" onclick="loadAll()">↻ Atualizar</button>
+  </div>
+
+  <div class="stats" id="stats">
+    <div class="stat"><div class="lbl">Utilizadores</div><div class="val" id="s-users">—</div></div>
+    <div class="stat"><div class="lbl">Depósitos pendentes</div><div class="val" id="s-deps">—</div></div>
+    <div class="stat"><div class="lbl">Saques pendentes</div><div class="val" id="s-wds">—</div></div>
+    <div class="stat"><div class="lbl">Robôs online</div><div class="val" id="s-bots">—</div></div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab active" data-tab="withdrawals" onclick="showTab('withdrawals')">💸 Saques</button>
+    <button class="tab" data-tab="deposits" onclick="showTab('deposits')">📥 Depósitos</button>
+    <button class="tab" data-tab="users" onclick="showTab('users')">👥 Utilizadores</button>
+    <button class="tab" data-tab="bots" onclick="showTab('bots')">🤖 Robôs</button>
+    <button class="tab" data-tab="history" onclick="showTab('history')">📊 Histórico</button>
+  </div>
+
+  <!-- SAQUES -->
+  <div class="panel active" id="panel-withdrawals">
+    <h2>Pedidos de saque <span class="count" id="c-wds">0</span></h2>
+    <div class="card">
+      <table>
+        <thead>
+          <tr>
+            <th>Cliente</th>
+            <th>Valor</th>
+            <th>Rede</th>
+            <th>Carteira do cliente</th>
+            <th>Data</th>
+            <th>Ação</th>
+          </tr>
+        </thead>
+        <tbody id="tb-withdrawals"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- DEPOSITOS -->
+  <div class="panel" id="panel-deposits">
+    <h2>Depósitos pendentes <span class="count" id="c-deps">0</span></h2>
+    <div class="card">
+      <table>
+        <thead>
+          <tr>
+            <th>Cliente</th>
+            <th>Moeda</th>
+            <th>Valor / Tx</th>
+            <th>Data</th>
+            <th>Creditar</th>
+          </tr>
+        </thead>
+        <tbody id="tb-deposits"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- USERS -->
+  <div class="panel" id="panel-users">
+    <h2>Utilizadores <span class="count" id="c-users">0</span></h2>
+    <div class="card">
+      <table>
+        <thead>
+          <tr>
+            <th>Telegram ID</th>
+            <th>Nome</th>
+            <th>Username</th>
+            <th>Saldo</th>
+            <th>Lucro total</th>
+            <th>Desde</th>
+          </tr>
+        </thead>
+        <tbody id="tb-users"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- BOTS -->
+  <div class="panel" id="panel-bots">
+    <h2>Robôs <span class="count" id="c-bots">0</span></h2>
+
+    <div class="card" style="padding:16px;margin-bottom:14px">
+      <strong style="display:block;margin-bottom:10px">Criar novo robô</strong>
+      <div class="row-actions" style="gap:8px">
+        <input id="new-bot-name" placeholder="Nome (ex: Alpha Over)" style="width:160px" />
+        <input id="new-bot-league" placeholder="Liga (ex: Premier League)" style="width:160px" />
+        <input id="new-bot-stake" type="number" placeholder="Stake $" value="15" style="width:90px" />
+        <button onclick="createBot()">+ Criar robô</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <table>
+        <thead>
+          <tr>
+            <th>Robô</th>
+            <th>Liga</th>
+            <th>Stake</th>
+            <th>Ativo</th>
+            <th>Estado live</th>
+            <th>Jogo</th>
+            <th>Ações</th>
+          </tr>
+        </thead>
+        <tbody id="tb-bots"></tbody>
+      </table>
+    </div>
+
+    <!-- Modal editar -->
+    <div id="edit-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:99;align-items:center;justify-content:center">
+      <div style="background:#111916;border:1px solid #1e2e26;border-radius:14px;padding:24px;width:90%;max-width:400px">
+        <h3 style="margin-bottom:14px">Editar robô</h3>
+        <input type="hidden" id="edit-bot-id" />
+        <label style="font-size:12px;color:#86a899">Nome</label>
+        <input id="edit-bot-name" style="width:100%;margin:6px 0 12px" />
+        <label style="font-size:12px;color:#86a899">Liga</label>
+        <input id="edit-bot-league" style="width:100%;margin:6px 0 12px" />
+        <label style="font-size:12px;color:#86a899">Stake ($)</label>
+        <input id="edit-bot-stake" type="number" style="width:100%;margin:6px 0 12px" />
+        <label style="font-size:12px;color:#86a899;display:flex;align-items:center;gap:8px;margin-bottom:16px">
+          <input type="checkbox" id="edit-bot-active" /> Ativo
+        </label>
+        <div class="row-actions">
+          <button onclick="saveBot()">Guardar</button>
+          <button class="secondary" onclick="closeEdit()">Cancelar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- HISTORY -->
+  <div class="panel" id="panel-history">
+    <h2>Histórico de jogos <span class="count" id="c-hist">0</span></h2>
+    <div class="card">
+      <table>
+        <thead>
+          <tr>
+            <th>Jogo</th>
+            <th>Liga</th>
+            <th>Tip</th>
+            <th>Odd</th>
+            <th>Resultado</th>
+            <th>P/L</th>
+            <th>Data</th>
+          </tr>
+        </thead>
+        <tbody id="tb-history"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <script>
+    const $ = (id) => document.getElementById(id)
+    const headers = () => ({
+      'Content-Type': 'application/json',
+      'x-admin-secret': $('secret').value,
+      'x-dev-telegram-id': 'admin-panel',
+    })
+    const base = () => $('api').value.replace(/\/$/, '')
+
+    function showTab(name) {
+      document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === name))
+      document.querySelectorAll('.panel').forEach(p => p.classList.toggle('active', p.id === 'panel-' + name))
+    }
+
+    function copyAddr(text) {
+      navigator.clipboard.writeText(text).then(() => alert('Endereço copiado!'))
+    }
+
+    function fmtDate(ts) {
+      if (!ts) return '—'
+      const d = typeof ts === 'number' ? new Date(ts) : new Date(ts)
+      return d.toLocaleString('pt-PT')
+    }
+
+    async function loadAll() {
+      await Promise.all([
+        loadWithdrawals(),
+        loadDeposits(),
+        loadUsers(),
+        loadBots(),
+        loadHistory(),
+      ])
+    }
+
+    // ========== SAQUES (com carteira do cliente) ==========
+    async function loadWithdrawals() {
+      try {
+        const res = await fetch(base() + '/api/admin/pending-withdrawals', { headers: headers() })
+        const data = await res.json()
+        if (!Array.isArray(data)) throw new Error(data.error || 'Erro')
+        $('s-wds').textContent = data.length
+        $('c-wds').textContent = data.length
+        const tb = $('tb-withdrawals')
+        if (!data.length) {
+          tb.innerHTML = '<tr><td colspan="6" class="empty">Nenhum saque pendente</td></tr>'
+          return
+        }
+        tb.innerHTML = data.map(w => `
+          <tr>
+            <td>
+              <strong>${w.first_name || '—'}</strong><br/>
+              <small style="color:#86a899">@${w.username || w.telegram_id}</small>
+            </td>
+            <td><strong style="color:#f59e0b">$${Number(w.amount).toFixed(2)}</strong></td>
+            <td><span class="badge blue">${w.network}</span></td>
+            <td>
+              <div class="addr" title="${w.address}">${w.address}</div>
+              <button class="copy-btn" onclick="copyAddr('${w.address.replace(/'/g, "\\'")}')">Copiar carteira</button>
+            </td>
+            <td style="white-space:nowrap;font-size:12px;color:#86a899">${fmtDate(w.created_at)}</td>
+            <td>
+              <div class="row-actions">
+                <button class="sm" onclick="processW('${w.id}','complete')">✓ Pago</button>
+                <button class="sm danger" onclick="processW('${w.id}','reject')">✗ Rejeitar</button>
+              </div>
+            </td>
+          </tr>
+        `).join('')
+      } catch (e) {
+        $('tb-withdrawals').innerHTML = `<tr><td colspan="6" class="empty">Erro: ${e.message}</td></tr>`
+      }
+    }
+
+    async function processW(id, action) {
+      const msg = action === 'complete'
+        ? 'Confirmas que JÁ ENVIASTE o crypto para a carteira do cliente?'
+        : 'Rejeitar e devolver o saldo ao cliente?'
+      if (!confirm(msg)) return
+      const res = await fetch(base() + '/api/admin/process-withdraw', {
+        method: 'POST', headers: headers(),
+        body: JSON.stringify({ withdrawId: id, action }),
+      })
+      const data = await res.json()
+      if (data.ok) { alert(action === 'complete' ? 'Saque marcado como pago.' : 'Saque rejeitado, saldo devolvido.'); loadAll() }
+      else alert(data.error || 'Erro')
+    }
+
+    // ========== DEPOSITOS ==========
+    async function loadDeposits() {
+      try {
+        const res = await fetch(base() + '/api/admin/pending-deposits', { headers: headers() })
+        const data = await res.json()
+        if (!Array.isArray(data)) throw new Error(data.error || 'Erro')
+        $('s-deps').textContent = data.length
+        $('c-deps').textContent = data.length
+        const tb = $('tb-deposits')
+        if (!data.length) {
+          tb.innerHTML = '<tr><td colspan="5" class="empty">Nenhum depósito pendente</td></tr>'
+          return
+        }
+        tb.innerHTML = data.map(d => `
+          <tr>
+            <td>
+              <strong>${d.first_name || '—'}</strong><br/>
+              <small style="color:#86a899">@${d.username || d.telegram_id}</small>
+            </td>
+            <td><span class="badge green">${d.coin}</span></td>
+            <td>
+              ${d.amount != null ? '$' + Number(d.amount).toFixed(2) : '—'}
+              ${d.tx_hash ? `<div class="addr">${d.tx_hash}</div>` : '<small style="color:#86a899">sem tx hash</small>'}
+            </td>
+            <td style="font-size:12px;color:#86a899">${fmtDate(d.created_at)}</td>
+            <td>
+              <div class="row-actions">
+                <input id="amt-${d.id}" type="number" placeholder="USD" value="${d.amount || ''}" style="width:90px" />
+                <button class="sm" onclick="credit('${d.id}')">Creditar</button>
+              </div>
+            </td>
+          </tr>
+        `).join('')
+      } catch (e) {
+        $('tb-deposits').innerHTML = `<tr><td colspan="5" class="empty">Erro: ${e.message}</td></tr>`
+      }
+    }
+
+    async function credit(id) {
+      const amount = parseFloat(document.getElementById('amt-' + id).value)
+      if (!amount || amount <= 0) return alert('Indica o valor em USD a creditar')
+      if (!confirm(`Creditar $${amount.toFixed(2)} a este utilizador?`)) return
+      const res = await fetch(base() + '/api/admin/credit-deposit', {
+        method: 'POST', headers: headers(),
+        body: JSON.stringify({ depositId: id, amount }),
+      })
+      const data = await res.json()
+      if (data.ok) { alert('Saldo creditado!'); loadAll() }
+      else alert(data.error || 'Erro')
+    }
+
+    // ========== USERS ==========
+    async function loadUsers() {
+      try {
+        // Usa endpoint admin users — se não existir, tenta via lista parcial
+        let res = await fetch(base() + '/api/admin/users', { headers: headers() })
+        let data = await res.json()
+        if (!Array.isArray(data)) {
+          // fallback: endpoint pode não existir ainda
+          data = []
+        }
+        $('s-users').textContent = data.length
+        $('c-users').textContent = data.length
+        const tb = $('tb-users')
+        if (!data.length) {
+          tb.innerHTML = '<tr><td colspan="6" class="empty">Sem utilizadores (ou endpoint /api/admin/users em falta)</td></tr>'
+          return
+        }
+        tb.innerHTML = data.map(u => `
+          <tr>
+            <td style="font-family:monospace;font-size:12px">${u.telegram_id}</td>
+            <td>${u.first_name || '—'}</td>
+            <td>@${u.username || '—'}</td>
+            <td><strong style="color:#22c55e">$${Number(u.balance).toFixed(2)}</strong></td>
+            <td style="color:${Number(u.total_profit) >= 0 ? '#22c55e' : '#ef4444'}">
+              ${Number(u.total_profit) >= 0 ? '+' : ''}${Number(u.total_profit).toFixed(2)}
+            </td>
+            <td style="font-size:12px;color:#86a899">${fmtDate(u.created_at)}</td>
+          </tr>
+        `).join('')
+      } catch (e) {
+        $('tb-users').innerHTML = `<tr><td colspan="6" class="empty">Erro: ${e.message}</td></tr>`
+      }
+    }
+
+    // ========== BOTS CRUD ==========
+    async function loadBots() {
+      try {
+        const res = await fetch(base() + '/api/admin/bots', { headers: headers() })
+        const data = await res.json()
+        if (!Array.isArray(data)) throw new Error(data.error || 'Erro')
+        const activeLive = data.filter(b => b.active && b.status !== 'idle').length
+        $('s-bots').textContent = activeLive + '/' + data.length
+        $('c-bots').textContent = data.length
+        const labels = {
+          idle: 'Em espera', scanning: 'A procurar...', entry_found: 'Entrada!', in_trade: 'Ativo', win: 'WIN', loss: 'LOSS'
+        }
+        const colors = {
+          idle: 'blue', scanning: 'blue', entry_found: 'orange', in_trade: 'green', win: 'green', loss: 'red'
+        }
+        window._botsCache = data
+        $('tb-bots').innerHTML = data.map(b => `
+          <tr>
+            <td><strong>${b.name}</strong><br/><small style="color:#86a899;font-family:monospace">${b.id}</small></td>
+            <td>${b.league}</td>
+            <td>$${Number(b.stake).toFixed(0)}</td>
+            <td><span class="badge ${b.active ? 'green' : 'red'}">${b.active ? 'ON' : 'OFF'}</span></td>
+            <td><span class="badge ${colors[b.status] || 'blue'}">${labels[b.status] || b.status || '—'}</span></td>
+            <td style="font-size:12px">${b.currentMatch || '—'}</td>
+            <td>
+              <div class="row-actions">
+                <button class="sm secondary" onclick="openEdit('${b.id}')">Editar</button>
+                <button class="sm secondary" onclick="toggleBot('${b.id}', ${b.active ? 0 : 1})">${b.active ? 'Desativar' : 'Ativar'}</button>
+                <button class="sm danger" onclick="deleteBot('${b.id}', '${String(b.name).replace(/'/g, "\\'")}')">Apagar</button>
+              </div>
+            </td>
+          </tr>
+        `).join('') || '<tr><td colspan="7" class="empty">Sem robôs — cria o primeiro acima</td></tr>'
+      } catch (e) {
+        $('tb-bots').innerHTML = `<tr><td colspan="7" class="empty">Erro: ${e.message}</td></tr>`
+      }
+    }
+
+    async function createBot() {
+      const name = $('new-bot-name').value.trim()
+      const league = $('new-bot-league').value.trim()
+      const stake = parseFloat($('new-bot-stake').value) || 10
+      if (!name || !league) return alert('Nome e liga são obrigatórios')
+      const res = await fetch(base() + '/api/admin/bots', {
+        method: 'POST', headers: headers(),
+        body: JSON.stringify({ name, league, stake }),
+      })
+      const data = await res.json()
+      if (data.ok) {
+        alert('Robô criado!')
+        $('new-bot-name').value = ''
+        $('new-bot-league').value = ''
+        loadBots()
+      } else alert(data.error || 'Erro')
+    }
+
+    function openEdit(id) {
+      const b = (window._botsCache || []).find(x => x.id === id)
+      if (!b) return
+      $('edit-bot-id').value = id
+      $('edit-bot-name').value = b.name
+      $('edit-bot-league').value = b.league
+      $('edit-bot-stake').value = b.stake
+      $('edit-bot-active').checked = !!b.active
+      const m = $('edit-modal')
+      m.style.display = 'flex'
+    }
+
+    function closeEdit() {
+      $('edit-modal').style.display = 'none'
+    }
+
+    async function saveBot() {
+      const id = $('edit-bot-id').value
+      const body = {
+        name: $('edit-bot-name').value.trim(),
+        league: $('edit-bot-league').value.trim(),
+        stake: parseFloat($('edit-bot-stake').value) || 10,
+        active: $('edit-bot-active').checked,
+      }
+      const res = await fetch(base() + '/api/admin/bots/' + id, {
+        method: 'PUT', headers: headers(),
+        body: JSON.stringify(body),
+      })
+      const data = await res.json()
+      if (data.ok) { closeEdit(); loadBots(); alert('Guardado!') }
+      else alert(data.error || 'Erro')
+    }
+
+    async function toggleBot(id, active) {
+      const res = await fetch(base() + '/api/admin/bots/' + id, {
+        method: 'PUT', headers: headers(),
+        body: JSON.stringify({ active: !!active }),
+      })
+      const data = await res.json()
+      if (data.ok) loadBots()
+      else alert(data.error || 'Erro')
+    }
+
+    async function deleteBot(id, name) {
+      if (!confirm('Apagar definitivamente o robô "' + name + '"?')) return
+      const res = await fetch(base() + '/api/admin/bots/' + id, {
+        method: 'DELETE', headers: headers(),
+      })
+      const data = await res.json()
+      if (data.ok) { alert('Apagado'); loadBots() }
+      else alert(data.error || 'Erro')
+    }
+
+    // ========== HISTORY ==========
+    async function loadHistory() {
+      try {
+        const res = await fetch(base() + '/api/history', { headers: headers() })
+        const data = await res.json()
+        if (!Array.isArray(data)) throw new Error(data.error || 'Erro')
+        $('c-hist').textContent = data.length
+        $('tb-history').innerHTML = data.map(m => `
+          <tr>
+            <td><strong>${m.home}</strong> ${m.score || ''} <strong>${m.away}</strong></td>
+            <td>${m.league}</td>
+            <td>${m.tip}</td>
+            <td>${m.odd}</td>
+            <td><span class="badge ${m.result === 'win' ? 'green' : 'red'}">${(m.result || '').toUpperCase()}</span></td>
+            <td style="color:${m.profit >= 0 ? '#22c55e' : '#ef4444'};font-weight:700">
+              ${m.profit >= 0 ? '+' : ''}${Number(m.profit).toFixed(2)}
+            </td>
+            <td style="font-size:12px;color:#86a899">${m.date}</td>
+          </tr>
+        `).join('') || '<tr><td colspan="7" class="empty">Sem histórico</td></tr>'
+      } catch (e) {
+        $('tb-history').innerHTML = `<tr><td colspan="7" class="empty">Erro: ${e.message}</td></tr>`
+      }
+    }
+  </script>
+</body>
+</html>
