@@ -3,14 +3,15 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "dev": "node --watch src/index.js",
     "start": "node src/index.js",
-    "init-db": "node src/init-db.js"
+    "dev": "node --watch src/index.js"
   },
   "dependencies": {
-    "better-sqlite3": "^11.7.0",
     "cors": "^2.8.5",
     "express": "^4.21.2",
     "uuid": "^11.0.3"
+  },
+  "engines": {
+    "node": ">=18"
   }
 }
